@@ -1,0 +1,4 @@
+name: Fishslap
+version: ${project.version}
+main: nl.rubend.fishslap.fishslap.Fishslap
+api-version: 1.15
