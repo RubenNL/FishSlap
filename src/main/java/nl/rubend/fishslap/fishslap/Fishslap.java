@@ -8,6 +8,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -18,10 +19,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public final class Fishslap extends JavaPlugin implements Listener {
 	private String worldName;
@@ -32,6 +30,8 @@ public final class Fishslap extends JavaPlugin implements Listener {
 	private ItemStack sugar = new ItemStack(Material.SUGAR);
 	private Map<String, Location> maps = new HashMap<>();
 	private String currentMap;
+	private Map<Player,Player> lastDamage=new HashMap<>();
+	private Map<Player,Integer> lastDamageTime=new HashMap<>();
 
 	@Override
 	public void onEnable() {
@@ -71,8 +71,15 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		currentMap = keys.get(new Random().nextInt(keys.size()));
 		for (Player player : getWorld().getPlayers()) onJoin(player);
 	}
-
+	private void sendToPlayers(String message) {
+		for(Player player:getWorld().getPlayers()) player.sendMessage("§b[FS]:"+message);
+	}
+	private Location getSpawn() {
+		return maps.get(currentMap);
+	}
 	private void onJoin(Player player) {
+		lastDamage.remove(player);
+		lastDamageTime.remove(player);
 		if (player.getWorld() != getWorld()) return;
 		player.getInventory().clear();
 		player.getInventory().setItem(0, fish);
@@ -81,8 +88,9 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		player.getInventory().setItem(3, sugar);
 		player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 1));
 		player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP, Integer.MAX_VALUE, 1));
-		player.teleport(maps.get(currentMap));
-		player.sendMessage("currently on map \""+currentMap+"\"!");
+		player.teleport(getSpawn());
+		player.setCollidable(false);
+		player.sendMessage("§ocurrently on map \""+currentMap+"\"!");
 	}
 
 	private World getWorld() {
@@ -110,6 +118,7 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		if (event.getEntity().getWorld() != getWorld()) return;
 		if (event.getCause() == EntityDamageEvent.DamageCause.VOID)
 			event.setDamage(((Player) event.getEntity()).getHealth());
+		else if(event.getCause()==EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
 		else event.setCancelled(true);
 	}
 
@@ -172,12 +181,29 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		Player player = event.getPlayer();
 		if (event.getPlayer().getWorld() != getWorld()) return;
 		if (player.getGameMode() == GameMode.CREATIVE) return;
-		if (player.getLocation().getY() < 80) onJoin(player);
+		if (player.getLocation().getY() > 80) return;
+		if (lastDamage.containsKey(player)) {
+			if(Bukkit.getCurrentTick()-lastDamageTime.get(player)<60) sendToPlayers(lastDamage.get(player).getName()+" slapped "+player.getName()+" out of the world.");
+			else sendToPlayers(player.getName()+" thought suicide was smart, while trying to escape "+lastDamage.get(player).getName());
+		}
+		else sendToPlayers(player.getName()+" thought suicide was smart.");
+		onJoin(player);
 	}
-
 	@Override
 	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
 		if (cmd.getName().equalsIgnoreCase("next")) nextMap();
 		return true;
+	}
+	@EventHandler private void onEntityDamage(EntityDamageByEntityEvent e) {
+		if(e.getDamager().getWorld()!=getWorld()) return;
+		if(!(e.getEntity() instanceof Player) || !(e.getDamager() instanceof Player)) return;
+		if(e.getEntity().getLocation().distance(getSpawn())<10) {
+			e.setCancelled(true);
+			return;
+		}
+		Player slapped= (Player) e.getEntity();
+		Player slapper= (Player) e.getDamager();
+		lastDamage.put(slapped,slapper);
+		lastDamageTime.put(slapped,Bukkit.getCurrentTick());
 	}
 }
