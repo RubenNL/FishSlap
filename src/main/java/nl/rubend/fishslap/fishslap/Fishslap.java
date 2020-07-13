@@ -46,18 +46,18 @@ public final class Fishslap extends JavaPlugin implements Listener {
 			return;
 		}
 		worldName = config.getString("worldName", "fs");
-		maps.put("Archill", new Location(getWorld(), -240, 100, 64));
-		maps.put("Birds", new Location(getWorld(), -315, 177, 416));
-		maps.put("IceVillage", new Location(getWorld(), -84, 160, 332));
-		maps.put("Balloons", new Location(getWorld(), -102, 120, 65));
-		maps.put("UFO", new Location(getWorld(), -217, 112, 187));
-		maps.put("Prody", new Location(getWorld(), -436, 165, 121));
-		maps.put("End", new Location(getWorld(), -354, 146, 268));
-		maps.put("SpaceStation", new Location(getWorld(), -466, 143, 280));
-		maps.put("Frozen", new Location(getWorld(), -175, 123, 482));
-		maps.put("RottenRotation", new Location(getWorld(), -92, 110, 188));
-		maps.put("FastFood", new Location(getWorld(), -225, 134, 322));
-		maps.put("Sculpture", new Location(getWorld(), -464, 123, 408));
+		maps.put("Archill", new Location(null,-240, 100, 64));
+		maps.put("Birds", new Location(null, -315, 177, 416));
+		maps.put("IceVillage", new Location(null, -84, 160, 332));
+		maps.put("Balloons", new Location(null, -102, 120, 65));
+		maps.put("UFO", new Location(null, -217, 112, 187));
+		maps.put("Prody", new Location(null, -436, 165, 121));
+		maps.put("End", new Location(null, -354, 146, 268));
+		maps.put("SpaceStation", new Location(null, -466, 143, 280));
+		maps.put("Frozen", new Location(null, -175, 123, 482));
+		maps.put("RottenRotation", new Location(null, -92, 110, 188));
+		maps.put("FastFood", new Location(null, -225, 134, 322));
+		maps.put("Sculpture", new Location(null, -464, 123, 408));
 		nextMap();
 	}
 
@@ -69,13 +69,16 @@ public final class Fishslap extends JavaPlugin implements Listener {
 	private void nextMap() {
 		ArrayList<String> keys = new ArrayList<>(maps.keySet());
 		currentMap = keys.get(new Random().nextInt(keys.size()));
+		if(getWorld()==null) return;
 		for (Player player : getWorld().getPlayers()) onJoin(player);
 	}
 	private void sendToPlayers(String message) {
 		for(Player player:getWorld().getPlayers()) player.sendMessage("§b[FS]:"+message);
 	}
 	private Location getSpawn() {
-		return maps.get(currentMap);
+		Location location=maps.get(currentMap);
+		location.setWorld(getWorld());
+		return location;
 	}
 	private void onJoin(Player player) {
 		lastDamage.remove(player);
@@ -94,16 +97,7 @@ public final class Fishslap extends JavaPlugin implements Listener {
 	}
 
 	private World getWorld() {
-		World world = Bukkit.getWorld(worldName);
-		if (world != null) return world;
-		WorldCreator wc = new WorldCreator(worldName);
-		world = Bukkit.getServer().createWorld(wc);
-		world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-		world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
-		world.setGameRule(GameRule.DO_FIRE_TICK, false);
-		world.setFullTime(6000);
-		world.setAutoSave(false);
-		return world;
+		return Bukkit.getWorld(worldName);
 	}
 
 	@EventHandler
