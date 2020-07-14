@@ -3,7 +3,6 @@ package nl.rubend.fishslap.fishslap;
 import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,9 +16,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.*;
 
-import java.io.File;
 import java.util.*;
+
+import static org.bukkit.event.EventPriority.LOW;
 
 public final class Fishslap extends JavaPlugin implements Listener {
 	private String worldName;
@@ -31,7 +32,7 @@ public final class Fishslap extends JavaPlugin implements Listener {
 	private String currentMap;
 	private Map<Player,Player> lastDamage=new HashMap<>();
 	private Map<Player,Integer> lastDamageTime=new HashMap<>();
-
+	private Map<Player,Scoreboard> boards=new HashMap<>();
 	@Override
 	public void onEnable() {
 		saveDefaultConfig();
@@ -63,7 +64,7 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		ArrayList<String> keys = new ArrayList<>(maps.keySet());
 		currentMap = keys.get(new Random().nextInt(keys.size()));
 		if(getWorld()==null) return;
-		for (Player player : getWorld().getPlayers()) onJoin(player);
+		for (Player player : getWorld().getPlayers()) toSpawn(player);
 	}
 	private void sendToPlayers(String message) {
 		for(Player player:getWorld().getPlayers()) player.sendMessage("§b[FS]:"+message);
@@ -73,10 +74,24 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		location.setWorld(getWorld());
 		return location;
 	}
+	private void onLeave(Player player) {
+		player.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
+		boards.remove(player);
+	}
 	private void onJoin(Player player) {
+		Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
+		board.registerNewObjective("SCORES","dummy","SCORES").setDisplaySlot(DisplaySlot.SIDEBAR);
+		boards.put(player,board);
+		player.setScoreboard(board);
+		toSpawn(player);
+	}
+	private void addToScore(Player player,String objective) {
+		Score score=boards.get(player).getObjective("SCORES").getScore(objective);
+		score.setScore(score.getScore()+1);
+	}
+	private void toSpawn(Player player) {
 		lastDamage.remove(player);
 		lastDamageTime.remove(player);
-		if (player.getWorld() != getWorld()) return;
 		player.getInventory().clear();
 		player.getInventory().setItem(0, fish);
 		player.getInventory().setItem(1, hoe);
@@ -86,6 +101,7 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP, Integer.MAX_VALUE, 1));
 		player.teleport(getSpawn());
 		player.setCollidable(false);
+		player.setFlying(false);
 		player.sendMessage("§ocurrently on map \""+currentMap+"\"!");
 	}
 
@@ -150,17 +166,19 @@ public final class Fishslap extends JavaPlugin implements Listener {
 
 	@EventHandler
 	private void onChangedWorld(PlayerChangedWorldEvent event) {
-		onJoin(event.getPlayer());
+		Player player=event.getPlayer();
+		if(player.getWorld()==getWorld()) onJoin(player);
+		if(event.getFrom()==getWorld()) onLeave(player);
 	}
 
 	@EventHandler
 	private void onRespawn(PlayerRespawnEvent event) {
-		onJoin(event.getPlayer());
+		if (event.getPlayer().getWorld() == getWorld()) toSpawn(event.getPlayer());
 	}
 
 	@EventHandler
 	private void onPlayerJoin(PlayerJoinEvent event) {
-		onJoin(event.getPlayer());
+		if (event.getPlayer().getWorld() == getWorld()) onJoin(event.getPlayer());
 	}
 
 	@EventHandler
@@ -170,16 +188,28 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		if (player.getGameMode() == GameMode.CREATIVE) return;
 		if (player.getLocation().getY() > 80) return;
 		if (lastDamage.containsKey(player)) {
-			if(Bukkit.getCurrentTick()-lastDamageTime.get(player)<60) sendToPlayers(lastDamage.get(player).getName()+" slapped "+player.getName()+" out of the world.");
-			else sendToPlayers(player.getName()+" thought suicide was smart, while trying to escape "+lastDamage.get(player).getName());
+			if(Bukkit.getCurrentTick()-lastDamageTime.get(player)<60) {
+				sendToPlayers(lastDamage.get(player).getName()+" slapped "+player.getName()+" out of the world.");
+				addToScore(lastDamage.get(player),"kills");
+				addToScore(player,"deaths");
+			} else {
+				sendToPlayers(player.getName()+" thought suicide was smart, while trying to escape "+lastDamage.get(player).getName());
+				addToScore(player,"suicides");
+			}
 		}
-		else sendToPlayers(player.getName()+" thought suicide was smart.");
-		onJoin(player);
+		else {
+			sendToPlayers(player.getName()+" thought suicide was smart.");
+			addToScore(player,"suicides");
+		}
+		toSpawn(player);
 	}
 	@Override
 	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
 		if (cmd.getName().equalsIgnoreCase("next")) nextMap();
 		return true;
+	}
+	@EventHandler private void onQuit(PlayerQuitEvent event) {
+		if (event.getPlayer().getWorld() == getWorld()) onLeave(event.getPlayer());
 	}
 	@EventHandler private void onEntityDamage(EntityDamageByEntityEvent e) {
 		if(e.getDamager().getWorld()!=getWorld()) return;
