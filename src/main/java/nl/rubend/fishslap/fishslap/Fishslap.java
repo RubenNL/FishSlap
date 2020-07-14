@@ -23,7 +23,6 @@ import java.util.*;
 
 public final class Fishslap extends JavaPlugin implements Listener {
 	private String worldName;
-	private YamlConfiguration config;
 	private ItemStack fish = new ItemStack(Material.COD);
 	private ItemStack hoe = new ItemStack(Material.IRON_HOE, 2);
 	private ItemStack feather = new ItemStack(Material.FEATHER);
@@ -35,17 +34,11 @@ public final class Fishslap extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
+		saveDefaultConfig();
 		Bukkit.getPluginManager().registerEvents(this, this);
 		fish.addUnsafeEnchantment(Enchantment.KNOCKBACK, 6);
 		this.saveResource("config.yml", false);
-		try {
-			config = YamlConfiguration.loadConfiguration(new File(this.getDataFolder(), "config.yml"));
-		} catch (IllegalArgumentException ex) {
-			ex.printStackTrace();
-			Bukkit.getPluginManager().disablePlugin(this);
-			return;
-		}
-		worldName = config.getString("worldName", "fs");
+		worldName = getConfig().getString("worldName", "fs");
 		maps.put("Archill", new Location(null,-240, 100, 64));
 		maps.put("Birds", new Location(null, -315, 177, 416));
 		maps.put("IceVillage", new Location(null, -84, 160, 332));
