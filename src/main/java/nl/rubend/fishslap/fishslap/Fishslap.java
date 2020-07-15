@@ -90,9 +90,17 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		boards.put(player,board);
 		player.setScoreboard(board);
 		toSpawn(player);
-		MemorySection scores= (MemorySection) getConfig().get("scores."+player.getUniqueId().toString());
-		if(scores==null) return;
-		for(String title:scores.getKeys(false)) board.getObjective("SCORES").getScore(title).setScore(scores.getInt(title));
+		Object scoreObject=getConfig().get("scores."+player.getUniqueId().toString());
+		if(scoreObject==null) return;
+		if(scoreObject instanceof Map) {
+			Map<String,Integer> scores=(Map) scoreObject;
+			for(String title:scores.keySet()) board.getObjective("SCORES").getScore(title).setScore(scores.get(title));
+		}
+		else if(scoreObject instanceof MemorySection) {
+			MemorySection scores=(MemorySection) scoreObject;
+			for(String title:scores.getKeys(false)) board.getObjective("SCORES").getScore(title).setScore(scores.getInt(title));
+		}
+
 	}
 	private void addToScore(Player player,String objective) {
 		Score score=boards.get(player).getObjective("SCORES").getScore(objective);
