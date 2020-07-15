@@ -3,6 +3,7 @@ package nl.rubend.fishslap.fishslap;
 import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.MemorySection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -19,8 +20,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.*;
 
 import java.util.*;
-
-import static org.bukkit.event.EventPriority.LOW;
 
 public final class Fishslap extends JavaPlugin implements Listener {
 	private String worldName;
@@ -75,6 +74,13 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		return location;
 	}
 	private void onLeave(Player player) {
+		Map<String,Integer> scores=new HashMap<>();
+		Objective obj=boards.get(player).getObjective("SCORES");
+		scores.put("kills",obj.getScore("kills").getScore());
+		scores.put("deaths",obj.getScore("deaths").getScore());
+		scores.put("suicides",obj.getScore("suicides").getScore());
+		getConfig().set("scores."+player.getUniqueId().toString(),scores);
+		saveConfig();
 		player.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
 		boards.remove(player);
 	}
@@ -84,6 +90,8 @@ public final class Fishslap extends JavaPlugin implements Listener {
 		boards.put(player,board);
 		player.setScoreboard(board);
 		toSpawn(player);
+		MemorySection scores= (MemorySection) getConfig().get("scores."+player.getUniqueId().toString());
+		for(String title:scores.getKeys(false)) board.getObjective("SCORES").getScore(title).setScore(scores.getInt(title));
 	}
 	private void addToScore(Player player,String objective) {
 		Score score=boards.get(player).getObjective("SCORES").getScore(objective);
